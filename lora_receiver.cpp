@@ -110,26 +110,33 @@ int main() {
     std::cout << "Sent: RECV -1\\r\\n" << std::endl;
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-    // 共有メモリの初期化
+    // 共有メモリ初期化
     int emer_fd = shm_open(EMER_SHM, O_CREAT | O_RDWR, 0666);
     if (emer_fd == -1) {
-        std::cerr << "Failed to open emergency shared memory." << std::endl;
+        std::cerr << "Failed to open emergency shared memory: " << strerror(errno) << std::endl;
         return 1;
     }
-    ftruncate(emer_fd, SHM_SIZE);
-    void* emer_ptr = mmap(nullptr, SHM_SIZE, PROT_WRITE, MAP_SHARED, emer_fd, 0);
+    if (ftruncate(emer_fd, SHM_SIZE) == -1) {
+        std::cerr << "Failed to set size for emergency shared memory: " << strerror(errno) << std::endl;
+        return 1;
+    }
+    void* emer_ptr = mmap(nullptr, SHM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, emer_fd, 0);
     if (emer_ptr == MAP_FAILED) {
         std::cerr << "mmap failed for emergency shared memory." << std::endl;
         return 1;
     }
     memset(emer_ptr, 0, SHM_SIZE); // 初期化
+
     int prop_fd = shm_open(PROP_SHM, O_CREAT | O_RDWR, 0666);
     if (prop_fd == -1) {
-        std::cerr << "Failed to open propeller shared memory." << std::endl;
+        std::cerr << "Failed to open propeller shared memory: " << strerror(errno) << std::endl;
         return 1;
     }
-    ftruncate(prop_fd, SHM_SIZE);
-    void* prop_ptr = mmap(nullptr, SHM_SIZE, PROT_WRITE, MAP_SHARED, prop_fd, 0);
+    if (ftruncate(prop_fd, SHM_SIZE) == -1) {
+        std::cerr << "Failed to set size for propeller shared memory: " << strerror(errno) << std::endl;
+        return 1;
+    }
+    void* prop_ptr = mmap(nullptr, SHM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, prop_fd, 0);
     if (prop_ptr == MAP_FAILED) {
         std::cerr << "mmap failed for propeller shared memory." << std::endl;
         return 1;
