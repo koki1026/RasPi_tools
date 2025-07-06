@@ -98,18 +98,23 @@ int main() {
 
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
     write(port, "Own = 6\r\n", 9);
+    std::cout << "Sent: Own = 6\\r\\n" << std::endl;
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
     write(port, "Dst = 5\r\n", 9);
+    std::cout << "Sent: Dst = 5\\r\\n" << std::endl;
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
      //確認コマンド
     write(port, "#?\r\n", 5);
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
     write(port, "RECV -1\r\n", 10);
+    std::cout << "Sent: RECV -1\\r\\n" << std::endl;
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
     while (true) {
         std::string data = read_serial_port(port);
         if (!data.empty()) {
+            std::cout << "Raw received: " << raw_received_data; // デバッグ用に生データも表示
+
             std::istringstream ss(data);
             std::string line;
             while (std::getline(ss, line)) {
