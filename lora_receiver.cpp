@@ -113,7 +113,7 @@ int main() {
     while (true) {
         std::string data = read_serial_port(port);
         if (!data.empty()) {
-            std::cout << "Raw received: " << raw_received_data; // デバッグ用に生データも表示
+            std::cout << "Raw received: " << data; // デバッグ用に生データも表示
 
             std::istringstream ss(data);
             std::string line;
