@@ -101,6 +101,9 @@ int main() {
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
     write(port, "Dst = 5\r\n", 9);
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
+     //確認コマンド
+    write_serial_port(lora_port, "#?\r\n");
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
     write(port, "RECV -1\r\n", 10);
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
