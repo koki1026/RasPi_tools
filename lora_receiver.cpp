@@ -16,8 +16,8 @@
 #include <errno.h>
 #include <sys/mman.h>
 
-#define PROP_SHM "/dev/shm/propeller_data"
-#define EMER_SHM "/dev/shm/emergency_data"
+#define EMER_SHM "/emergency_data"
+#define PROP_SHM "/propeller_data"
 #define SHM_SIZE 256
 
 int open_serial_port(const char* device, speed_t baud_rate) {
