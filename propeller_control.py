@@ -1,6 +1,7 @@
 import time
 import mmap
 import os
+import re
 from Adafruit_PCA9685 import PCA9685
 
 # 共有メモリの設定
@@ -29,13 +30,15 @@ def limit_pwm_change(new, current):
 
 def parse_pwm_data(data_str):
     try:
-        parts = data_str.strip().split(",")
-        if len(parts) != 2:
+        # 角括弧ありの形式に対応
+        match = re.match(r"\[(\d+),\s*(\d+)\]", data_str.strip())
+        if not match:
             return None
-        left = validate_pwm(int(parts[0]))
-        right = validate_pwm(int(parts[1]))
+        left = validate_pwm(int(match.group(1)))
+        right = validate_pwm(int(match.group(2)))
         return [left, right]
-    except:
+    except Exception as e:
+        print(f"parse_pwm_data error: {e}")
         return None
 
 def main():
