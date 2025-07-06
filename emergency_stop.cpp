@@ -191,7 +191,7 @@ int main() {
             std::istringstream stream(raw_received_data);
             std::string line;
 
-            While (std::getline(stream, line)) {
+            while (std::getline(stream, line)) {
                 // 受信データの整形 (改行コードや不要な文字を除去)
                 raw_received_data.erase(std::remove(raw_received_data.begin(), raw_received_data.end(), '\r'), raw_received_data.end());
                 raw_received_data.erase(std::remove(raw_received_data.begin(), raw_received_data.end(), '\n'), raw_received_data.end());
