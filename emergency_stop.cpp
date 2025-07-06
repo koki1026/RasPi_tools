@@ -176,30 +176,52 @@ int main() {
     std::cout << "Sent: RECV -1\\r\\n" << std::endl;
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
+    //Heartbeat 監視用タイムスタンプ
+    auto last_heartbeat_time = std::chrono::steady_clock::now();
+
     // 5. メインループ：LoRaからの信号受信とGPIO制御
-    std::cout << "Waiting for LoRa commands ('Start' or 'Stop')..." << std::endl;
+    std::cout << "Waiting for LoRa commands ('Start' or 'Stop' or Heartbeat 'True')..." << std::endl;
+
     while (true) {
         std::string raw_received_data = read_serial_port(lora_port);
         if (!raw_received_data.empty()) {
             std::cout << "Raw received: " << raw_received_data; // デバッグ用に生データも表示
 
-            // 受信データの整形 (改行コードや不要な文字を除去)
-            raw_received_data.erase(std::remove(raw_received_data.begin(), raw_received_data.end(), '\r'), raw_received_data.end());
-            raw_received_data.erase(std::remove(raw_received_data.begin(), raw_received_data.end(), '\n'), raw_received_data.end());
+            // --- ここで改行で複数メッセージに分割する ---
+            std::istringstream stream(raw_received_data);
+            std::string line;
 
-            std::string actual_message = parse_received_message(raw_received_data);
+            While (std::getline(stream, line)) {
+                // 受信データの整形 (改行コードや不要な文字を除去)
+                raw_received_data.erase(std::remove(raw_received_data.begin(), raw_received_data.end(), '\r'), raw_received_data.end());
+                raw_received_data.erase(std::remove(raw_received_data.begin(), raw_received_data.end(), '\n'), raw_received_data.end());
 
-            if (!actual_message.empty()) {
-                std::cout << "Parsed message: " << actual_message << std::endl;
+                std::string actual_message = parse_received_message(raw_received_data);
 
-                if (actual_message == "Start") {
-                    gpioWrite(RELAY_PIN, PI_HIGH); // リレーON (プロペラ通電)
-                    std::cout << "RELAY: HIGH (Propeller ON)" << std::endl;
-                } else if (actual_message == "Stop") {
-                    gpioWrite(RELAY_PIN, PI_LOW); // リレーOFF (プロペラ停止)
-                    std::cout << "RELAY: LOW (Propeller OFF)" << std::endl;
+                if (!actual_message.empty()) {
+                    std::cout << "Parsed message: " << actual_message << std::endl;
+
+                    if (actual_message == "Start") {
+                        gpioWrite(RELAY_PIN, PI_HIGH); // リレーON (プロペラ通電)
+                        std::cout << "RELAY: HIGH (Propeller ON)" << std::endl;
+                    } else if (actual_message == "Stop") {
+                        gpioWrite(RELAY_PIN, PI_LOW); // リレーOFF (プロペラ停止)
+                        std::cout << "RELAY: LOW (Propeller OFF)" << std::endl;
+                    } else if (actual_message == "True") {
+                        // Heartbeatの確認
+                        last_heartbeat_time = std::chrono::steady_clock::now();
+                        std::cout << "Heartbeat received." << std::endl;
+                    }
                 }
             }
+        }
+
+        // Heartbeatのタイムスタンプをチェック
+        auto now = std::chrono::steady_clock::now();
+        auto elapsed_time = std::chrono::duration_cast<std::chrono::seconds>(now - last_heartbeat_time).count();
+        if (elapsed_time > 5) { // 5秒以上Heartbeatが受信されていない場合
+            std::cerr << "No Heartbeat received for " << elapsed_time << " seconds. Stopping the propeller." << std::endl;
+            gpioWrite(RELAY_PIN, PI_LOW); // リレーOFF (プロペラ停止)
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(50)); // ポーリング間隔を調整
     }
