@@ -16,8 +16,8 @@
 #include <errno.h>
 #include <sys/mman.h>
 
-#define PROP_SHM "/dev/shm/propeller_data"
-#define EMER_SHM "/dev/shm/emergency_data"
+#define EMER_SHM "/emergency_data"
+#define PROP_SHM "/propeller_data"
 #define SHM_SIZE 256
 
 int open_serial_port(const char* device, speed_t baud_rate) {
@@ -96,17 +96,58 @@ int main() {
     int port = open_serial_port(device, B115200);
     if (port < 0) return 1;
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     write(port, "Own = 6\r\n", 9);
-    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    std::cout << "Sent: Own = 6\\r\\n" << std::endl;
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
     write(port, "Dst = 5\r\n", 9);
-    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    std::cout << "Sent: Dst = 5\\r\\n" << std::endl;
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+     //確認コマンド
+    write(port, "#?\r\n", 5);
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
     write(port, "RECV -1\r\n", 10);
-    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    std::cout << "Sent: RECV -1\\r\\n" << std::endl;
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+    // 共有メモリ初期化
+    int emer_fd = shm_open(EMER_SHM, O_CREAT | O_RDWR, 0666);
+    if (emer_fd == -1) {
+        std::cerr << "Failed to open emergency shared memory: " << strerror(errno) << std::endl;
+        return 1;
+    }
+    if (ftruncate(emer_fd, SHM_SIZE) == -1) {
+        std::cerr << "Failed to set size for emergency shared memory: " << strerror(errno) << std::endl;
+        return 1;
+    }
+    void* emer_ptr = mmap(nullptr, SHM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, emer_fd, 0);
+    if (emer_ptr == MAP_FAILED) {
+        std::cerr << "mmap failed for emergency shared memory." << std::endl;
+        return 1;
+    }
+    memset(emer_ptr, 0, SHM_SIZE); // 初期化
+
+    int prop_fd = shm_open(PROP_SHM, O_CREAT | O_RDWR, 0666);
+    if (prop_fd == -1) {
+        std::cerr << "Failed to open propeller shared memory: " << strerror(errno) << std::endl;
+        return 1;
+    }
+    if (ftruncate(prop_fd, SHM_SIZE) == -1) {
+        std::cerr << "Failed to set size for propeller shared memory: " << strerror(errno) << std::endl;
+        return 1;
+    }
+    void* prop_ptr = mmap(nullptr, SHM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, prop_fd, 0);
+    if (prop_ptr == MAP_FAILED) {
+        std::cerr << "mmap failed for propeller shared memory." << std::endl;
+        return 1;
+    }
+    memset(prop_ptr, 0, SHM_SIZE); // 初期化
 
     while (true) {
         std::string data = read_serial_port(port);
         if (!data.empty()) {
+            std::cout << "Raw received: " << data; // デバッグ用に生データも表示
+
             std::istringstream ss(data);
             std::string line;
             while (std::getline(ss, line)) {
