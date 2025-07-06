@@ -157,7 +157,7 @@ void send_controller_loop(int serial_port) {
         std::string message = "[" + std::to_string(left) + "," + std::to_string(right) + "]";
         write_serial_port(serial_port, message);
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(500)); // 100ms周期
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // 100ms周期
     }
     SDL_JoystickClose(joystick);
     SDL_Quit();

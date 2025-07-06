@@ -15,10 +15,15 @@
 #include <cstring>
 #include <errno.h>
 #include <sys/mman.h>
+#include <ctime>
+
 
 #define EMER_SHM "/emergency_data"
 #define PROP_SHM "/propeller_data"
 #define SHM_SIZE 256
+#define HEARTBEAT_TIMEOUT 5 // 5秒間Heartbeatが受信されなかった場合のタイムアウト
+
+std::time_t last_heartbeat = 0;
 
 int open_serial_port(const char* device, speed_t baud_rate) {
     int serial_port = open(device, O_RDWR | O_NOCTTY | O_NDELAY);
@@ -91,6 +96,15 @@ std::string parse_message(const std::string& raw) {
     return "";
 }
 
+void update_heartbeat_status() {
+    std::time_t now = std::time(nullptr);
+    double diff = std::difftime(now, last_heartbeat);
+    if (diff < HEARTBEAT_TIMEOUT) {
+    } else {
+        write_to_shm(EMER_SHM, "Low");
+    }
+}
+
 int main() {
     const char* device = "/dev/ttyUSB0";
     int port = open_serial_port(device, B115200);
@@ -156,10 +170,20 @@ int main() {
                 std::string msg = parse_message(line);
                 if (msg.empty()) continue;
 
-                if (msg == "Start" || msg == "Stop" || msg == "True") {
-                    write_to_shm(EMER_SHM, msg);
-                    std::cout << "[EMERGENCY] " << msg << std::endl;
-                } else if (msg.front() == '[' && msg.back() == ']') {
+                if (msg == "True")
+                {
+                    last_heartbeat = std::time(nullptr);
+                    std::cout << "[HEARTBEAT] Received True" << std::endl;
+                }
+                else if (msg == "Start") {
+                    write_to_shm(EMER_SHM, "High");
+                    std::cout << "[EMERGENCY] Start" << std::endl;
+                }
+                else if (msg == "Stop") {
+                    write_to_shm(EMER_SHM, "Low");
+                    std::cout << "[EMERGENCY] Stop" << std::endl;
+                }
+                 else if (msg.front() == '[' && msg.back() == ']') {
                     write_to_shm(PROP_SHM, msg);
                     std::cout << "[PROP PWM] " << msg << std::endl;
                 } else {
@@ -167,7 +191,9 @@ int main() {
                 }
             }
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        // ハートビートの更新
+        update_heartbeat_status();
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
     close(port);
