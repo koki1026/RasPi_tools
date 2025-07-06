@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <atomic>
 #include <thread>
+#include <SDL2/SDL.h>
 
 // --- 関数プロトタイプ（宣言） ---
 int open_serial_port(const char* device, speed_t baud_rate);
@@ -18,6 +19,7 @@ std::string read_serial_port_multi(int serial_port, int max_attempts = 10, int w
 void init_lora_module(int serial_port);
 
 std::atomic<bool> heartbeat_running(false);
+std::atomic<bool> controller_sending_running(false);
 
 // シリアルポートを開く
 int open_serial_port(const char* device, speed_t baud_rate) {
@@ -125,6 +127,43 @@ std::string read_serial_port(int serial_port) {
     return "";
 }
 
+void send_controller_loop(int serial_port) {
+    if (SDL_Init(SDL_INIT_JOYSTICK) < 0) {
+        std::cerr << "SDL could not initialize! SDL_Error: " << SDL_GetError() << std::endl;
+        return;
+    }
+    SDL_Joystick* joystick = nullptr;
+    if (SDL_NumJoysticks() > 0) {
+        joystick = SDL_JoystickOpen(0); // 最初のジョイスティック
+    }
+    if (!joystick) {
+        std::cerr << "No joystick found or could not open joystick! SDL_Error: " << SDL_GetError() << std::endl;
+        SDL_Quit();
+        return;
+    }
+
+    std::cout << "Joystick opened: " << SDL_JoystickName(joystick) << std::endl;
+
+    while (controller_sending_running.load()) {
+        SDL_JoystickUpdate(); // ジョイスティックの状態を更新
+
+        int axis1 = SDL_JoystickGetAxis(joystick, 1); // 左スティックY軸
+        int axis2 = SDL_JoystickGetAxis(joystick, 4); // 右スティックY軸
+
+        // 軸の値を500から300の範囲に変換
+        int left = (axis1 + 32768) * (300 - 500) / (65535 - 0) + 500; // 左スティック
+        int right = (axis2 + 32768) * (300 - 500) / (65535 - 0) + 500; // 右スティック
+
+        std::string message = "[" + std::to_string(left) + "," + std::to_string(right) + "]";
+        write_serial_port(serial_port, message);
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(500)); // 100ms周期
+    }
+    SDL_JoystickClose(joystick);
+    SDL_Quit();
+    std::cout << "Controller sending stopped." << std::endl;
+}
+
 std::string read_serial_port_multi(int serial_port, int max_attempts, int wait_ms) {
     std::string total_data;
     char buf[256];
@@ -156,10 +195,13 @@ int main() {
     std::cout << "Serial port opened. Type Start / Stop . Type 'exit' to quit.\n";
     std::cout << "Type 'start_heartbeat' to begin sending heartbeat messages.\n";
     std::cout << "Type 'stop_heartbeat' to stop sending heartbeat messages.\n";
+    std::cout << "Type 'start_controller' to begin sending controller messages.\n";
+    std::cout << "Type 'stop_controller' to stop sending controller messages.\n";
 
     std::string input;
 
     std::thread heartbeat_thread;
+    std::thread controller_thread;
 
     while (true) {
         std::cout << "> ";
@@ -186,6 +228,26 @@ int main() {
                 std::cout << "Heartbeat was not running.\n";
             }
             continue;
+        }else if (input == "start_controller") {
+            if (!controller_sending_running) {
+                controller_sending_running = true;
+                controller_thread = std::thread(send_controller_loop, serial);
+                std::cout << "Controller sending started.\n";
+            } else {
+                std::cout << "Controller sending is already running.\n";
+            }
+            continue;
+        } else if (input == "stop_controller") {
+            if (controller_sending_running) {
+                controller_sending_running = false;
+                if (controller_thread.joinable()) {
+                    controller_thread.join();
+                }
+                std::cout << "Controller sending stopped.\n";
+            } else {
+                std::cout << "Controller sending was not running.\n";
+            }
+            continue;
         }
         if (input.empty()) continue;
 
@@ -201,6 +263,14 @@ int main() {
             heartbeat_thread.join();
         }
         std::cout << "Heartbeat stopped.\n";
+    }
+    // コントローラ送信スレッドが動いている場合は停止
+    if (controller_sending_running) {
+        controller_sending_running = false;
+        if (controller_thread.joinable()) {
+            controller_thread.join();
+        }
+        std::cout << "Controller sending stopped.\n";
     }
     // シリアルポートを閉じる
     close(serial);
