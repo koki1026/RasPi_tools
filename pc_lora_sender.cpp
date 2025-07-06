@@ -18,6 +18,7 @@ std::string read_serial_port_multi(int serial_port, int max_attempts = 10, int w
 void init_lora_module(int serial_port);
 
 std::atomic<bool> heartbeat_running(false);
+std::atomic<bool> controller_sending_running(false);
 
 // シリアルポートを開く
 int open_serial_port(const char* device, speed_t baud_rate) {
@@ -125,6 +126,19 @@ std::string read_serial_port(int serial_port) {
     return "";
 }
 
+void send_controller_loop(int serial_port) {
+    while (controller_sending_running.load()) {
+        // 仮のコントローラ値（実際は他から取得して代入）
+        int left = 400;
+        int right = 400;
+
+        std::string message = "[" + std::to_string(left) + "," + std::to_string(right) + "]";
+        write_serial_port(serial_port, message);
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 100ms周期
+    }
+}
+
 std::string read_serial_port_multi(int serial_port, int max_attempts, int wait_ms) {
     std::string total_data;
     char buf[256];
@@ -156,10 +170,13 @@ int main() {
     std::cout << "Serial port opened. Type Start / Stop . Type 'exit' to quit.\n";
     std::cout << "Type 'start_heartbeat' to begin sending heartbeat messages.\n";
     std::cout << "Type 'stop_heartbeat' to stop sending heartbeat messages.\n";
+    std::cout << "Type 'start_controller' to begin sending controller messages.\n";
+    std::cout << "Type 'stop_controller' to stop sending controller messages.\n";
 
     std::string input;
 
     std::thread heartbeat_thread;
+    std::thread controller_thread;
 
     while (true) {
         std::cout << "> ";
@@ -186,6 +203,26 @@ int main() {
                 std::cout << "Heartbeat was not running.\n";
             }
             continue;
+        }else if (input == "start_controller") {
+            if (!controller_sending_running) {
+                controller_sending_running = true;
+                controller_thread = std::thread(send_controller_loop, serial);
+                std::cout << "Controller sending started.\n";
+            } else {
+                std::cout << "Controller sending is already running.\n";
+            }
+            continue;
+        } else if (input == "stop_controller") {
+            if (controller_sending_running) {
+                controller_sending_running = false;
+                if (controller_thread.joinable()) {
+                    controller_thread.join();
+                }
+                std::cout << "Controller sending stopped.\n";
+            } else {
+                std::cout << "Controller sending was not running.\n";
+            }
+            continue;
         }
         if (input.empty()) continue;
 
@@ -201,6 +238,14 @@ int main() {
             heartbeat_thread.join();
         }
         std::cout << "Heartbeat stopped.\n";
+    }
+    // コントローラ送信スレッドが動いている場合は停止
+    if (controller_sending_running) {
+        controller_sending_running = false;
+        if (controller_thread.joinable()) {
+            controller_thread.join();
+        }
+        std::cout << "Controller sending stopped.\n";
     }
     // シリアルポートを閉じる
     close(serial);
