@@ -101,12 +101,11 @@ void write_serial_port(int serial_port, const std::string& data) {
     if (bytes_written < 0) {
         std::cerr << "Error writing: " << strerror(errno) << std::endl;
     }
-    else if (data == "True") {
-        // Trueだった場合はcoutなしで終了
-    }
-    // それ以外のコマンドは出力する 
-    else {
+    // Start or Stopコマンドの場合は、特別なメッセージを表示
+    else if (data == "Start" || data == "Stop") {
         std::cout << "Sent: " << full_command;
+    } else {
+        // 通常のメッセージの場合は、表示しない
     }
 }
 
