@@ -53,29 +53,16 @@ int main() {
         if (!message.empty() && message != last_message) {
             last_message = message;
 
-            if (message == "Start") {
+            if (message == "High") {
                 gpioWrite(RELAY_PIN, PI_HIGH);
                 std::cout << "[RELAY] ON (Start received)\n";
-            } else if (message == "Stop") {
+            } else if (message == "Low") {
                 gpioWrite(RELAY_PIN, PI_LOW);
                 std::cout << "[RELAY] OFF (Stop received)\n";
-            } else if (message == "True") {
-                // Heartbeat
-                last_heartbeat_time = std::chrono::steady_clock::now();
-                std::cout << "[Heartbeat] Received\n";
             } else {
                 std::cout << "[Unknown] Received message: " << message << std::endl;
             }
         }
-
-        // Heartbeat監視（5秒以上来てないとOFFに）
-        auto now = std::chrono::steady_clock::now();
-        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - last_heartbeat_time).count();
-        if (elapsed > 5) {
-            gpioWrite(RELAY_PIN, PI_LOW);
-            std::cerr << "[Timeout] No Heartbeat for " << elapsed << " sec → RELAY OFF\n";
-        }
-
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
