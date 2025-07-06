@@ -14,6 +14,12 @@
 #include <unistd.h>    // UNIX standard function definitions
 #include <cstring>     // For memset, memcpy, strerror
 #include <errno.h>     // For errno
+#include <sys/mman.h>
+#include <unistd.h>
+#include <cstring>
+
+#define SHM_NAME "/proppeler_shm" // 共有メモリの名前
+#define SHM_SIZE 256 // 共有メモリのサイズ
 
 // --- シリアルポート制御関数群 ---
 // これらの関数を前回の説明からコピーして追加します
@@ -179,6 +185,19 @@ int main() {
     //Heartbeat 監視用タイムスタンプ
     auto last_heartbeat_time = std::chrono::steady_clock::now();
 
+    // --- 共有メモリの初期化 ---
+    int shm_fd = shm_open(SHM_NAME, O_CREAT | O_RDWR, 0666);
+    if (shm_fd == -1) {
+        std::cerr << "Failed to open shared memory." << std::endl;
+        return 1;
+    }
+    ftruncate(shm_fd, SHM_SIZE);
+    void* shm_ptr = mmap(nullptr, SHM_SIZE, PROT_WRITE, MAP_SHARED, shm_fd, 0);
+    if (shm_ptr == MAP_FAILED) {
+        std::cerr << "mmap failed." << std::endl;
+        return 1;
+    }
+
     // 5. メインループ：LoRaからの信号受信とGPIO制御
     std::cout << "Waiting for LoRa commands ('Start' or 'Stop' or Heartbeat 'True')..." << std::endl;
 
@@ -200,6 +219,12 @@ int main() {
 
                 if (!actual_message.empty()) {
                     std::cout << "Parsed message: " << actual_message << std::endl;
+
+                    // --- 共有メモリに書き込む ---
+                    memset(shm_ptr, 0, SHM_SIZE);  // 共有メモリ領域をすべて0でクリア
+                    std::string msg_to_write = actual_message.substr(0, SHM_SIZE - 1); // overflow防止
+                    memcpy(shm_ptr, msg_to_write.c_str(), msg_to_write.size());
+                    ((char*)shm_ptr)[msg_to_write.size()] = '\0';
 
                     if (actual_message == "Start") {
                         gpioWrite(RELAY_PIN, PI_HIGH); // リレーON (プロペラ通電)
