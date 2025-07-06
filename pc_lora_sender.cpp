@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <atomic>
 #include <thread>
+#include <SDL2/SDL.h>
 
 // --- 関数プロトタイプ（宣言） ---
 int open_serial_port(const char* device, speed_t baud_rate);
@@ -127,16 +128,40 @@ std::string read_serial_port(int serial_port) {
 }
 
 void send_controller_loop(int serial_port) {
+    if (SDL_Init(SDL_INIT_JOYSTICK) < 0) {
+        std::cerr << "SDL could not initialize! SDL_Error: " << SDL_GetError() << std::endl;
+        return;
+    }
+    SDL_Joystick* joystick = nullptr;
+    if (SDL_NumJoysticks() > 0) {
+        joystick = SDL_JoystickOpen(0); // 最初のジョイスティック
+    }
+    if (!joystick) {
+        std::cerr << "No joystick found or could not open joystick! SDL_Error: " << SDL_GetError() << std::endl;
+        SDL_Quit();
+        return;
+    }
+
+    std::cout << "Joystick opened: " << SDL_JoystickName(joystick) << std::endl;
+
     while (controller_sending_running.load()) {
-        // 仮のコントローラ値（実際は他から取得して代入）
-        int left = 400;
-        int right = 400;
+        SDL_JoystickUpdate(); // ジョイスティックの状態を更新
+
+        int axis1 = SDL_JoystickGetAxis(joystick, 1); // 左スティックY軸
+        int axis2 = SDL_JoystickGetAxis(joystick, 4); // 右スティックY軸
+
+        // 軸の値を500から300の範囲に変換
+        int left = (axis1 + 32768) * (300 - 500) / (65535 - 0) + 500; // 左スティック
+        int right = (axis2 + 32768) * (300 - 500) / (65535 - 0) + 500; // 右スティック
 
         std::string message = "[" + std::to_string(left) + "," + std::to_string(right) + "]";
         write_serial_port(serial_port, message);
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 100ms周期
+        std::this_thread::sleep_for(std::chrono::milliseconds(500)); // 100ms周期
     }
+    SDL_JoystickClose(joystick);
+    SDL_Quit();
+    std::cout << "Controller sending stopped." << std::endl;
 }
 
 std::string read_serial_port_multi(int serial_port, int max_attempts, int wait_ms) {
