@@ -18,7 +18,7 @@
 #include <unistd.h>
 #include <cstring>
 
-#define SHM_NAME "/proppeler_shm" // 共有メモリの名前
+#define SHM_NAME "/propeller_shm" // 共有メモリの名前
 #define SHM_SIZE 256 // 共有メモリのサイズ
 
 // --- シリアルポート制御関数群 ---
