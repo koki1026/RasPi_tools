@@ -11,6 +11,7 @@
 #define SHM_NAME "/emergency_data"
 #define SHM_SIZE 256
 #define RELAY_PIN 17
+#define RELAY_PIN_2 27 // 2つ目のリレー用ピン（必要に応じて変更）
 
 int main() {
     // pigpio 初期化
@@ -20,7 +21,9 @@ int main() {
     }
 
     gpioSetMode(RELAY_PIN, PI_OUTPUT);
+    gpioSetMode(RELAY_PIN_2, PI_OUTPUT); // 2つ目のリレーも設定
     gpioWrite(RELAY_PIN, PI_LOW); // 初期状態はOFF
+    gpioWrite(RELAY_PIN_2, PI_LOW); // 2つ目のリレーもOFF
 
     // 共有メモリを開く
     int shm_fd = shm_open(SHM_NAME, O_RDONLY, 0666);
@@ -55,9 +58,11 @@ int main() {
 
             if (message == "High") {
                 gpioWrite(RELAY_PIN, PI_HIGH);
+                gpioWrite(RELAY_PIN_2, PI_HIGH);
                 std::cout << "[RELAY] ON (Start received)\n";
             } else if (message == "Low") {
                 gpioWrite(RELAY_PIN, PI_LOW);
+                gpioWrite(RELAY_PIN_2, PI_LOW);
                 std::cout << "[RELAY] OFF (Stop received)\n";
             } else {
                 std::cout << "[Unknown] Received message: " << message << std::endl;
