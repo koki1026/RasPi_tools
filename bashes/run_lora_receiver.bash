@@ -1,2 +1,2 @@
 #! /bin/bash
-./lora_receiver
+../lora_receiver
