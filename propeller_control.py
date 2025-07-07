@@ -43,7 +43,7 @@ def parse_pwm_data(data_str):
 
 def main():
     # PCA9685 初期化
-    pwm = PCA9685()
+    pwm = PCA9685(address=0x41)
     pwm.set_pwm_freq(60)
 
     # ESC アーム処理
