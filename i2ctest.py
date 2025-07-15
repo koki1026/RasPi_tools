@@ -7,6 +7,15 @@
 import time
 import sys
 
+def write_to_shared_memory(voltage, current, power):
+    """共有メモリへデータを書き込む関数"""
+    try:
+        with open("/dev/shm/battery_data", "w") as f:
+            f.write(f"{voltage:.3f},{current:.3f},{power:.3f}\n")
+        print("✓ /dev/shm/battery_data に書き込みました")
+    except Exception as e:
+        print(f"✗ 共有メモリ書き込みエラー: {e}")
+
 def detailed_i2c_test():
     """詳細なI2C通信テスト"""
     print("=== 詳細I2C通信テスト ===")
@@ -109,6 +118,8 @@ def test_ina219_if_found(address):
         
         power = ina219.power
         print(f"5. 電力: {power:.3f} mW")
+
+        write_to_shared_memory(bus_voltage, current, power)
         
         print("✓ INA219動作確認成功！")
         return True
