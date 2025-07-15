@@ -1,2 +1,2 @@
 #! /bin/bash
-./lora_sender
+~/RasPi_tools/lora_sender

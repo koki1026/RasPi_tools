@@ -1,3 +1,3 @@
 #! /bin/bash
 source ~/i2c_env/bin/activate
-python3 ../battery_sensor.py
+python3 ~/RasPi_tools/battery_sensor.py

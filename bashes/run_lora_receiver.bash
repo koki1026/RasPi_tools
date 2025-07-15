@@ -1,2 +1,2 @@
 #! /bin/bash
-../lora_receiver
+~/RasPi_tools/lora_receiver

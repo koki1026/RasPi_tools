@@ -1,2 +1,2 @@
 #! /bin/bash
-sudo ../emergency_relay
+sudo ~/RasPi_tools/emergency_relay
